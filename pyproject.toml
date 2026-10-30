@@ -1,0 +1,26 @@
+[project]
+name = "adk-mcp-project"
+version = "0.1.0"
+description = "Multi-agent party planner: ADK orchestrator + A2A specialists + MCP data server, with OpenTelemetry and Grafana."
+readme = "README.md"
+requires-python = ">=3.12,<3.14"
+dependencies = [
+    "google-adk[a2a,otel]",
+    "httpx",
+    "mcp>=2.3.0",
+    "opentelemetry-api",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-instrumentation-httpx",
+    "opentelemetry-instrumentation-starlette",
+    "opentelemetry-sdk",
+    "python-dotenv",
+    "pyyaml",
+    "uvicorn",
+]
+
+[project.scripts]
+adk-mcp-project = "adk_mcp_project:main"
+
+[build-system]
+requires = ["uv_build>=0.13.6,<0.14.0"]
+build-backend = "uv_build"

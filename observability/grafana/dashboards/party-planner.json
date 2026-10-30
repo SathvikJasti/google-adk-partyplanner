@@ -1,0 +1,206 @@
+{
+  "uid": "party-planner",
+  "title": "Party Planner - Agents, MCP & LLM",
+  "description": "Party planner orchestrator, A2A specialists and MCP server: requests, latency, LLM usage, tools, traces and logs.",
+  "tags": ["party-planner", "adk", "a2a", "mcp", "otel"],
+  "timezone": "browser",
+  "editable": true,
+  "graphTooltip": 1,
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": { "qryType": 1, "query": "label_values(http_server_request_duration_seconds_count{service_namespace=\"party-planner\"}, service_name)", "refId": "PrometheusVariableQueryEditor-VariableQuery" },
+        "definition": "label_values(http_server_request_duration_seconds_count{service_namespace=\"party-planner\"}, service_name)",
+        "refresh": 2,
+        "includeAll": true,
+        "multi": true,
+        "allValue": ".*",
+        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "sort": 1
+      }
+    ]
+  },
+  "panels": [
+    { "type": "row", "title": "Overview", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 100, "panels": [] },
+    {
+      "id": 1, "type": "stat", "title": "Planning requests",
+      "description": "Requests to the party planner's /run and /run_sse endpoints in the selected range.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 0, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "blue" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "expr": "sum (((last_over_time(http_server_request_duration_seconds_count{service_name=\"party_planner\", http_route=~\"/run.*\"}[$__range]) - http_server_request_duration_seconds_count{service_name=\"party_planner\", http_route=~\"/run.*\"} offset $__range) >= 0) or last_over_time(http_server_request_duration_seconds_count{service_name=\"party_planner\", http_route=~\"/run.*\"}[$__range]))", "instant": true } ]
+    },
+    {
+      "id": 2, "type": "stat", "title": "p95 end-to-end latency",
+      "description": "95th percentile duration of a full planning request (all LLM calls, MCP tools and A2A calls).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 5, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "s", "decimals": 1, "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 60 }, { "color": "red", "value": 180 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le) (((last_over_time(http_server_request_duration_seconds_bucket{service_name=\"party_planner\", http_route=~\"/run.*\"}[$__range]) - http_server_request_duration_seconds_bucket{service_name=\"party_planner\", http_route=~\"/run.*\"} offset $__range) >= 0) or last_over_time(http_server_request_duration_seconds_bucket{service_name=\"party_planner\", http_route=~\"/run.*\"}[$__range])))", "instant": true } ]
+    },
+    {
+      "id": 3, "type": "stat", "title": "HTTP 5xx ratio",
+      "description": "Share of server responses with a 5xx status, across the selected services.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 4, "x": 10, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "decimals": 1, "noValue": "0%", "color": { "mode": "thresholds" }, "thresholds": { "mode": "absolute", "steps": [ { "color": "green", "value": null }, { "color": "orange", "value": 0.01 }, { "color": "red", "value": 0.05 } ] } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "expr": "sum(increase(http_server_request_duration_seconds_count{service_name=~\"$service\", http_response_status_code=~\"5..\"}[$__range])) / sum(increase(http_server_request_duration_seconds_count{service_name=~\"$service\"}[$__range]))", "instant": true } ]
+    },
+    {
+      "id": 4, "type": "stat", "title": "LLM calls",
+      "description": "Gemini generate_content calls across all agents.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 14, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "expr": "sum (((last_over_time(gen_ai_client_operation_duration_seconds_count{service_name=~\"$service\"}[$__range]) - gen_ai_client_operation_duration_seconds_count{service_name=~\"$service\"} offset $__range) >= 0) or last_over_time(gen_ai_client_operation_duration_seconds_count{service_name=~\"$service\"}[$__range]))", "instant": true } ]
+    },
+    {
+      "id": 5, "type": "stat", "title": "Tokens used",
+      "description": "Input + output tokens across all agents.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 4, "w": 5, "x": 19, "y": 1 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "color": { "mode": "fixed", "fixedColor": "purple" } }, "overrides": [] },
+      "options": { "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "colorMode": "value", "graphMode": "none", "textMode": "value" },
+      "targets": [ { "refId": "A", "expr": "sum (((last_over_time(gen_ai_client_token_usage_sum{service_name=~\"$service\"}[$__range]) - gen_ai_client_token_usage_sum{service_name=~\"$service\"} offset $__range) >= 0) or last_over_time(gen_ai_client_token_usage_sum{service_name=~\"$service\"}[$__range]))", "instant": true } ]
+    },
+
+    { "type": "row", "title": "Agents & LLM", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }, "id": 101, "panels": [] },
+    {
+      "id": 6, "type": "timeseries", "title": "Agent invocation duration (p95)",
+      "description": "ADK invoke_agent duration per agent. Remote agents appear twice: as seen by the caller (party_planner) and by themselves.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto", "spanNulls": true } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, gen_ai_agent_name, service_name) ((((gen_ai_invoke_agent_duration_seconds_bucket{service_name=~\"$service\"} - gen_ai_invoke_agent_duration_seconds_bucket{service_name=~\"$service\"} offset $__rate_interval) >= 0) or gen_ai_invoke_agent_duration_seconds_bucket{service_name=~\"$service\"})))", "legendFormat": "{{gen_ai_agent_name}} (in {{service_name}})" } ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "LLM call latency (p95)",
+      "description": "Gemini generate_content latency per service. This is usually where most of a request's time goes.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto", "spanNulls": true } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, service_name, gen_ai_request_model) ((((gen_ai_client_operation_duration_seconds_bucket{service_name=~\"$service\"} - gen_ai_client_operation_duration_seconds_bucket{service_name=~\"$service\"} offset $__rate_interval) >= 0) or gen_ai_client_operation_duration_seconds_bucket{service_name=~\"$service\"})))", "legendFormat": "{{service_name}} ({{gen_ai_request_model}})" } ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Token usage by service",
+      "description": "Tokens per interval, split into input and output.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "bars", "fillOpacity": 70, "stacking": { "mode": "normal", "group": "A" }, "lineWidth": 1 } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "refId": "A", "expr": "sum by (service_name, gen_ai_token_type) ((((gen_ai_client_token_usage_sum{service_name=~\"$service\"} - gen_ai_client_token_usage_sum{service_name=~\"$service\"} offset $__rate_interval) >= 0) or gen_ai_client_token_usage_sum{service_name=~\"$service\"}))", "legendFormat": "{{service_name}} {{gen_ai_token_type}}" } ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Tool execution duration (p95)",
+      "description": "ADK execute_tool duration: MCP tools, the A2A specialists (budget_agent, compliance_agent) as tools, and the specialists' local tools.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 14 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto", "spanNulls": true } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, gen_ai_tool_name, gen_ai_agent_name) ((((gen_ai_execute_tool_duration_seconds_bucket{service_name=~\"$service\"} - gen_ai_execute_tool_duration_seconds_bucket{service_name=~\"$service\"} offset $__rate_interval) >= 0) or gen_ai_execute_tool_duration_seconds_bucket{service_name=~\"$service\"})))", "legendFormat": "{{gen_ai_tool_name}} (by {{gen_ai_agent_name}})" } ]
+    },
+
+    { "type": "row", "title": "Services, A2A & MCP", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 22 }, "id": 102, "panels": [] },
+    {
+      "id": 10, "type": "timeseries", "title": "HTTP requests by service", "description": "Requests per interval, by service and route.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
+      "fieldConfig": { "defaults": { "unit": "short", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto", "spanNulls": true } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "refId": "A", "expr": "sum by (service_name, http_route) ((((http_server_request_duration_seconds_count{service_name=~\"$service\"} - http_server_request_duration_seconds_count{service_name=~\"$service\"} offset $__rate_interval) >= 0) or http_server_request_duration_seconds_count{service_name=~\"$service\"}))", "legendFormat": "{{service_name}} {{http_route}}" } ]
+    },
+    {
+      "id": 11, "type": "timeseries", "title": "A2A round trip to specialists (p95)",
+      "description": "Full time from the party planner calling a remote agent over A2A until its streamed answer completes (ADK execute_tool on the caller side).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto", "spanNulls": true } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [
+        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, gen_ai_tool_name) ((((gen_ai_execute_tool_duration_seconds_bucket{service_name=\"party_planner\", gen_ai_tool_name=~\"budget_agent|compliance_agent\"} - gen_ai_execute_tool_duration_seconds_bucket{service_name=\"party_planner\", gen_ai_tool_name=~\"budget_agent|compliance_agent\"} offset $__rate_interval) >= 0) or gen_ai_execute_tool_duration_seconds_bucket{service_name=\"party_planner\", gen_ai_tool_name=~\"budget_agent|compliance_agent\"})))", "legendFormat": "{{gen_ai_tool_name}}" }
+      ]
+    },
+    {
+      "id": 12, "type": "bargauge", "title": "MCP tool calls",
+      "description": "Calls handled by the MCP data server, by tool, in the selected range.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0, "min": 0, "color": { "mode": "fixed", "fixedColor": "green" } }, "overrides": [] },
+      "options": { "orientation": "horizontal", "displayMode": "basic", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }, "showUnfilled": true },
+      "targets": [ { "refId": "A", "expr": "sum by (tool) (((last_over_time(mcp_tool_calls_total[$__range]) - mcp_tool_calls_total offset $__range) >= 0) or last_over_time(mcp_tool_calls_total[$__range]))", "legendFormat": "{{tool}}", "instant": true } ]
+    },
+    {
+      "id": 13, "type": "piechart", "title": "Compliance results",
+      "description": "check_event_compliance outcomes: clear, action_needed, blocked.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [
+        { "matcher": { "id": "byName", "options": "clear" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] },
+        { "matcher": { "id": "byName", "options": "action_needed" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "orange" } } ] },
+        { "matcher": { "id": "byName", "options": "blocked" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] }
+      ] },
+      "options": { "pieType": "donut", "legend": { "displayMode": "list", "placement": "right", "values": ["value"] }, "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [ { "refId": "A", "expr": "sum by (status) (((last_over_time(compliance_checks_total[$__range]) - compliance_checks_total offset $__range) >= 0) or last_over_time(compliance_checks_total[$__range]))", "legendFormat": "{{status}}", "instant": true } ]
+    },
+    {
+      "id": 14, "type": "piechart", "title": "Budget fit",
+      "description": "calculate_event_cost results: does the priced option fit the budget?",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 }, "overrides": [
+        { "matcher": { "id": "byName", "options": "fits" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } } ] },
+        { "matcher": { "id": "byName", "options": "over budget" }, "properties": [ { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } } ] }
+      ] },
+      "options": { "pieType": "donut", "legend": { "displayMode": "list", "placement": "right", "values": ["value"] }, "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "targets": [
+        { "refId": "A", "expr": "sum (((last_over_time(budget_evaluations_total{fits_budget=\"true\"}[$__range]) - budget_evaluations_total{fits_budget=\"true\"} offset $__range) >= 0) or last_over_time(budget_evaluations_total{fits_budget=\"true\"}[$__range]))", "legendFormat": "fits", "instant": true },
+        { "refId": "B", "expr": "sum (((last_over_time(budget_evaluations_total{fits_budget=\"false\"}[$__range]) - budget_evaluations_total{fits_budget=\"false\"} offset $__range) >= 0) or last_over_time(budget_evaluations_total{fits_budget=\"false\"}[$__range]))", "legendFormat": "over budget", "instant": true }
+      ]
+    },
+    {
+      "id": 15, "type": "timeseries", "title": "HTTP server latency by service (p95)",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 31 },
+      "fieldConfig": { "defaults": { "unit": "s", "custom": { "drawStyle": "line", "lineWidth": 2, "fillOpacity": 10, "showPoints": "auto", "spanNulls": true } }, "overrides": [] },
+      "options": { "legend": { "displayMode": "list", "placement": "bottom" }, "tooltip": { "mode": "multi", "sort": "desc" } },
+      "targets": [ { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, service_name) ((((http_server_request_duration_seconds_bucket{service_name=~\"$service\"} - http_server_request_duration_seconds_bucket{service_name=~\"$service\"} offset $__rate_interval) >= 0) or http_server_request_duration_seconds_bucket{service_name=~\"$service\"})))", "legendFormat": "{{service_name}}" } ]
+    },
+
+    { "type": "row", "title": "Traces & logs", "collapsed": false, "gridPos": { "h": 1, "w": 24, "x": 0, "y": 39 }, "id": 103, "panels": [] },
+    {
+      "id": 16, "type": "nodeGraph", "title": "Service graph",
+      "description": "Built by Tempo from spans: who calls whom, request rate and latency.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 11, "w": 10, "x": 0, "y": 40 },
+      "targets": [ { "refId": "A", "datasource": { "type": "tempo", "uid": "tempo" }, "queryType": "serviceMap" } ]
+    },
+    {
+      "id": 17, "type": "table", "title": "Recent planning requests (click a trace)",
+      "description": "Each row is one user request; open it to see the full trace across party_planner, MCP, budget_agent and compliance_agent.",
+      "datasource": { "type": "tempo", "uid": "tempo" },
+      "gridPos": { "h": 11, "w": 14, "x": 10, "y": 40 },
+      "targets": [ { "refId": "A", "datasource": { "type": "tempo", "uid": "tempo" }, "queryType": "traceql", "query": "{ resource.service.name = \"party_planner\" && span.http.route =~ \"/run.*\" }", "limit": 20, "tableType": "traces" } ]
+    },
+    {
+      "id": 18, "type": "logs", "title": "Logs",
+      "description": "Python logs from all services. Expand a line with a trace_id to jump to its trace.",
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 51 },
+      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true, "prettifyLogMessage": false, "dedupStrategy": "none" },
+      "targets": [ { "refId": "A", "datasource": { "type": "loki", "uid": "loki" }, "expr": "{service_namespace=\"party-planner\", service_name=~\"$service\"}" } ]
+    }
+  ]
+}
