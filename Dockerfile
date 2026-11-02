@@ -21,4 +21,7 @@ ENV PATH="/app/.venv/bin:$PATH" BIND_HOST=0.0.0.0
 RUN useradd --create-home app && chown -R app /app
 USER app
 
-CMD ["python", "-m", "agents"]
+# SERVICE picks the module (agents, budget_agent, compliance_agent, mcp_server);
+# a container command/args set on the platform overrides this.
+ENV SERVICE=agents
+CMD ["sh", "-c", "exec python -m ${SERVICE}"]
