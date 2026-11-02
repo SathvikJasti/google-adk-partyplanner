@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import httpx
 import yaml
 
 from common import config
@@ -199,6 +200,78 @@ def search_entertainment(
             continue
         results.append({"id": e["id"], "name": e["name"], "category": e["category"], "fee": e["fee"]})
     return results or [{"message": "No entertainers available for those criteria."}]
+
+
+# WMO weather codes (Open-Meteo "weather_code") grouped into plain descriptions.
+_WEATHER_CODES = {
+    0: "clear sky", 1: "mostly clear", 2: "partly cloudy", 3: "overcast",
+    45: "fog", 48: "freezing fog",
+    51: "light drizzle", 53: "drizzle", 55: "heavy drizzle", 56: "freezing drizzle", 57: "heavy freezing drizzle",
+    61: "light rain", 63: "rain", 65: "heavy rain", 66: "freezing rain", 67: "heavy freezing rain",
+    71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains",
+    80: "light rain showers", 81: "rain showers", 82: "violent rain showers",
+    85: "light snow showers", 86: "heavy snow showers",
+    95: "thunderstorm", 96: "thunderstorm with hail", 99: "severe thunderstorm with hail",
+}
+_FORECAST_DAYS = 16  # Open-Meteo's free forecast horizon
+_WEATHER_TIMEOUT = 5.0  # seconds per call; a slow public API must not stall a plan
+
+
+@mcp.tool()
+async def get_weather_forecast(city: str, event_date: str) -> dict:
+    """Get the weather forecast for a city on event_date (YYYY-MM-DD), from the
+    public Open-Meteo service (no key). Useful for outdoor venues. Forecasts only
+    exist for about the next 16 days; for later dates, or if the service is
+    unavailable, the result has available=false and a message. Temperatures in
+    Fahrenheit, wind in mph, precipitation in inches."""
+    TOOL_CALLS.add(1, {"tool": "get_weather_forecast"})
+    try:
+        day = date.fromisoformat(event_date)
+    except ValueError:
+        return {"available": False, "message": "event_date must be YYYY-MM-DD."}
+    days_ahead = (day - date.today()).days
+    if days_ahead < 0:
+        return {"available": False, "message": "That date is in the past."}
+    if days_ahead >= _FORECAST_DAYS:
+        return {"available": False, "city": city, "event_date": event_date,
+                "message": f"No forecast yet: it is {days_ahead} days away and forecasts cover "
+                           f"about {_FORECAST_DAYS} days. Check again closer to the date."}
+
+    try:
+        async with httpx.AsyncClient(timeout=_WEATHER_TIMEOUT) as client:
+            geo = await client.get("https://geocoding-api.open-meteo.com/v1/search",
+                                   params={"name": city, "count": 1, "language": "en"})
+            geo.raise_for_status()
+            places = geo.json().get("results")
+            if not places:
+                return {"available": False, "message": f"Could not find a place called '{city}'."}
+            place = places[0]
+            wx = await client.get("https://api.open-meteo.com/v1/forecast", params={
+                "latitude": place["latitude"], "longitude": place["longitude"],
+                "daily": "weather_code,temperature_2m_max,temperature_2m_min,"
+                         "precipitation_probability_max,precipitation_sum,wind_speed_10m_max",
+                "temperature_unit": "fahrenheit", "wind_speed_unit": "mph", "precipitation_unit": "inch",
+                "timezone": "auto", "start_date": event_date, "end_date": event_date,
+            })
+            wx.raise_for_status()
+            daily = wx.json()["daily"]
+    except (httpx.HTTPError, KeyError, ValueError) as exc:
+        return {"available": False, "message": f"Weather service unavailable ({type(exc).__name__}). "
+                                                "Do not guess the weather."}
+
+    rain_pct = daily["precipitation_probability_max"][0]
+    return {
+        "available": True,
+        "city": f"{place['name']}, {place.get('admin1', place.get('country', ''))}".rstrip(", "),
+        "event_date": event_date,
+        "summary": _WEATHER_CODES.get(daily["weather_code"][0], "unknown"),
+        "high_f": daily["temperature_2m_max"][0],
+        "low_f": daily["temperature_2m_min"][0],
+        "rain_chance_pct": rain_pct,
+        "precipitation_in": daily["precipitation_sum"][0],
+        "max_wind_mph": daily["wind_speed_10m_max"][0],
+        "source": "Open-Meteo",
+    }
 
 
 @mcp.custom_route("/health", methods=["GET"])

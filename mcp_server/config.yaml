@@ -3,4 +3,5 @@ version: "1.0.0"
 instructions: >
   Party planning data service. Search available venues, read venue details
   (policies, curfew, catering rules), list catering packages, and find
-  entertainers. All prices are in USD.
+  entertainers, plus a live weather forecast (public Open-Meteo service)
+  for dates within about 16 days. All prices are in USD.
