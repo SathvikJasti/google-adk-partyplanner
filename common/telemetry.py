@@ -46,6 +46,11 @@ def setup_telemetry(service_name: str, *, adk_web_server: bool = False) -> None:
     bridge_python_logging() once ADK is up.
     """
     os.environ["OTEL_SERVICE_NAME"] = service_name
+    if not os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        # No collector configured (e.g. a cost-free cloud test): keep logging to the console only.
+        _instrument_libraries()
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+        return
     resource = Resource.create({"service.name": service_name})
     _create_meter_provider(resource)
     if not adk_web_server:
@@ -111,6 +116,8 @@ def bridge_python_logging() -> None:
     """Send standard `logging` records to OTel (with trace/span ids) and the console."""
     root = logging.getLogger()
     root.setLevel(logging.INFO)
+    if not os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT"):
+        return
     if any(isinstance(h, LoggingHandler) for h in root.handlers):
         return
     if not root.handlers:

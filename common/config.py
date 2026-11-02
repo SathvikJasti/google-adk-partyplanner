@@ -6,6 +6,7 @@ runs locally, in containers, or behind a load balancer without changes.
 
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -32,3 +33,13 @@ COMPLIANCE_AGENT_URL = os.getenv("COMPLIANCE_AGENT_URL", f"http://{PUBLIC_HOST}:
 # Seconds to wait on a remote agent (A2A) or the MCP server before giving up.
 A2A_TIMEOUT = float(os.getenv("A2A_TIMEOUT", "120"))
 MCP_TIMEOUT = float(os.getenv("MCP_TIMEOUT", "10"))
+
+# Google ID-token auth on calls between services. Needed on Cloud Run, where the
+# backends are private; leave off locally.
+SERVICE_AUTH = os.getenv("SERVICE_AUTH", "false").lower() in ("1", "true", "yes")
+
+
+def card_address(public_url: str) -> tuple[str, str, int]:
+    """(protocol, host, port) to publish in an agent card for a service's own public URL."""
+    u = urlparse(public_url)
+    return u.scheme, u.hostname, u.port or (443 if u.scheme == "https" else 80)

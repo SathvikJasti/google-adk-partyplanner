@@ -1,0 +1,10 @@
+.venv/
+.git/
+.env
+.run/
+.adk/
+__pycache__/
+*.pyc
+observability/
+deploy/
+scripts/

@@ -74,8 +74,10 @@ root_agent = Agent(
 )
 
 # A2A over HTTP (JSON-RPC, with SSE streaming advertised in the agent card).
-# host/port only set the URL published in the card.
-a2a_app = to_a2a(root_agent, host=config.PUBLIC_HOST, port=config.BUDGET_AGENT_PORT)
+# protocol/host/port only set the URL published in the card (this service's own
+# public URL, e.g. its Cloud Run address).
+_protocol, _host, _port = config.card_address(config.BUDGET_AGENT_URL)
+a2a_app = to_a2a(root_agent, host=_host, port=_port, protocol=_protocol)
 a2a_app.router.routes.append(health_route("budget_agent"))
 
 # Extract the incoming W3C traceparent so this agent's spans join the caller's trace
