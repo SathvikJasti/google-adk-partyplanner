@@ -1,5 +1,13 @@
 # GCP deployment plan (zero-cost test setup)
 
+> **As deployed (2026-11-02):** one Cloud Run service, `pp-party-planner`, with four containers
+> from one image: the planner (ingress, :8000) plus the MCP server and both A2A agents as
+> sidecars reached on 127.0.0.1:8001-8003. The account used couldn't grant IAM roles, so the
+> separate-service design below (private services calling each other) wasn't possible. Sidecars
+> keep the agents as separate processes talking HTTP/A2A, need no IAM and no public URLs.
+> The Gemini key is a plain env var (no Secret Manager rights). See [deploy.sh](deploy.sh).
+> The sections below describe the original plan.
+
 Project: `eternal-nucleus-513516-a2` (number `34656130941`), **shared**.
 Region: **us-east4** (Northern Virginia, the closest region to New York).
 Goal: try the system on GCP as the only user, paying nothing.

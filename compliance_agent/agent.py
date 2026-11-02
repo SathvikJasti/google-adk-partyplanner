@@ -2,7 +2,7 @@ import math
 from datetime import date
 from pathlib import Path
 
-from common import config
+from common import config, llm
 from common.telemetry import instrument_app, setup_telemetry
 
 setup_telemetry("compliance_agent")  # before ADK is imported
@@ -103,7 +103,7 @@ def check_event_compliance(
 
 root_agent = Agent(
     name="compliance_agent",
-    model=CFG["model"],
+    model=llm.gemini(CFG["model"]),
     description=CFG["description"].strip(),
     instruction=CFG["instruction"],
     tools=[get_city_rules, check_event_compliance],

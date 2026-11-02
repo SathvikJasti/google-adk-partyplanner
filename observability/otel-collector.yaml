@@ -8,6 +8,15 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+  # Same protocol on a second port that requires a bearer token. Only this one is exposed
+  # (through a tunnel) so the cloud deployment can send telemetry here.
+  otlp/cloud:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4319
+        auth:
+          authenticator: bearertokenauth
+
 processors:
   memory_limiter:
     check_interval: 1s
@@ -31,19 +40,21 @@ exporters:
 extensions:
   health_check:
     endpoint: 0.0.0.0:13133
+  bearertokenauth:
+    token: ${env:OTEL_INGEST_TOKEN}
 
 service:
-  extensions: [health_check]
+  extensions: [health_check, bearertokenauth]
   pipelines:
     traces:
-      receivers: [otlp]
+      receivers: [otlp, otlp/cloud]
       processors: [memory_limiter, batch]
       exporters: [otlp/tempo]
     metrics:
-      receivers: [otlp]
+      receivers: [otlp, otlp/cloud]
       processors: [memory_limiter, batch]
       exporters: [otlphttp/prometheus]
     logs:
-      receivers: [otlp]
+      receivers: [otlp, otlp/cloud]
       processors: [memory_limiter, batch]
       exporters: [otlphttp/loki]

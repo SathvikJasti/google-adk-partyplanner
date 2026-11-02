@@ -25,6 +25,7 @@ app = get_fast_api_app(
     web=True,
     host=config.PUBLIC_HOST,
     port=config.PARTY_PLANNER_PORT,
+    allow_origins=config.ALLOW_ORIGINS or None,
 )
 bridge_python_logging()
 # Skip the probe and the web UI's static assets.

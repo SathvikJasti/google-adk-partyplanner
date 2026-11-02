@@ -30,6 +30,11 @@ MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", f"http://{PUBLIC_HOST}:{MCP_SERVER_
 BUDGET_AGENT_URL = os.getenv("BUDGET_AGENT_URL", f"http://{PUBLIC_HOST}:{BUDGET_AGENT_PORT}")
 COMPLIANCE_AGENT_URL = os.getenv("COMPLIANCE_AGENT_URL", f"http://{PUBLIC_HOST}:{COMPLIANCE_AGENT_PORT}")
 
+# Browser origins the ADK web UI accepts, comma-separated (entries starting with "regex:" are
+# patterns). ADK rejects any other Origin, which breaks the UI behind a proxy such as
+# `gcloud run services proxy` (browser at localhost, server sees the run.app host).
+ALLOW_ORIGINS = [o.strip() for o in os.getenv("ALLOW_ORIGINS", "").split(",") if o.strip()]
+
 # Seconds to wait on a remote agent (A2A) or the MCP server before giving up.
 A2A_TIMEOUT = float(os.getenv("A2A_TIMEOUT", "120"))
 MCP_TIMEOUT = float(os.getenv("MCP_TIMEOUT", "10"))

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from common import config
+from common import config, llm
 from common.telemetry import instrument_app, setup_telemetry
 
 setup_telemetry("budget_agent")  # before ADK is imported
@@ -67,7 +67,7 @@ def calculate_event_cost(
 
 root_agent = Agent(
     name="budget_agent",
-    model=CFG["model"],
+    model=llm.gemini(CFG["model"]),
     description=CFG["description"].strip(),
     instruction=CFG["instruction"],
     tools=[calculate_event_cost],

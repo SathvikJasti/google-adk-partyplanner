@@ -6,7 +6,7 @@ from google.adk.agents.remote_a2a_agent import AGENT_CARD_WELL_KNOWN_PATH, Remot
 from google.adk.tools.agent_tool import AgentTool
 from google.adk.tools.mcp_tool import McpToolset, StreamableHTTPConnectionParams
 
-from common import auth, config
+from common import auth, config, llm
 
 CFG = yaml.safe_load((Path(__file__).parent / "instructions.yaml").read_text(encoding="utf-8"))
 
@@ -37,7 +37,7 @@ remote_compliance_agent = RemoteA2aAgent(
 
 root_agent = Agent(
     name="party_planner",
-    model=CFG["model"],
+    model=llm.gemini(CFG["model"]),
     description=CFG["party_planner"]["description"].strip(),
     instruction=CFG["party_planner"]["instruction"],
     tools=[

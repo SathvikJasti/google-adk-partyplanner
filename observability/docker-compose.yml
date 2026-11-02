@@ -10,11 +10,15 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.128.0
     command: ["--config=/etc/otelcol/config.yaml"]
+    environment:
+      # Bearer token for the tunnelled :4319 receiver; set it in observability/.env
+      OTEL_INGEST_TOKEN: ${OTEL_INGEST_TOKEN:-unused-local-token}
     volumes:
       - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
     ports:
       - "4317:4317"   # OTLP gRPC
       - "4318:4318"   # OTLP HTTP (the services export here)
+      - "4319:4319"   # OTLP HTTP with bearer token (tunnelled, for the cloud deployment)
       - "13133:13133" # health check
     depends_on: [tempo, prometheus, loki]
     restart: unless-stopped
